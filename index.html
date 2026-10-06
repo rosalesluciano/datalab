@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PandasQuest</title>
-  <meta name="description" content="Aprende Python pandas desde cero hasta nivel profesional con ejercicios prácticos que se corrigen al instante en tu navegador y en Google Colab.">
-  <meta name="theme-color" content="#0d0b1e">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐼</text></svg>">
+  <title>DataLab · Ciencia de Datos con método</title>
+  <meta name="description" content="Laboratorio personal de Ciencia de Datos: Python, Pandas, DataFrames, NumPy, Matplotlib, Seaborn y Machine Learning. Reconocer problemas, diseñar soluciones, usar IA como copiloto, debuggear y verificar.">
+  <meta name="theme-color" content="#0b1220">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧪</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -22,25 +22,26 @@
   </script>
 </head>
 <body>
+  <a class="skip" href="#app">Saltar al contenido</a>
   <header class="topbar">
     <a class="logo" href="#/" aria-label="Inicio">
-      <span class="logo-mark">🐼</span><span class="logo-text">Pandas<b>Quest</b></span>
+      <span class="logo-mark">🧪</span><span class="logo-text">Data<b>Lab</b><small>PandasQuest</small></span>
     </a>
+    <nav class="nav" aria-label="Principal">
+      <a href="#/" data-nav="#/"><span class="ni">🗺️</span><span class="nt">Ruta</span></a>
+      <a href="#/quiz" data-nav="#/quiz"><span class="ni">🎯</span><span class="nt">¿Sé esto?</span></a>
+      <a href="#/ia" data-nav="#/ia"><span class="ni">🤖</span><span class="nt">Método IA</span></a>
+      <a href="#/progreso" data-nav="#/progreso"><span class="ni">📈</span><span class="nt">Progreso</span></a>
+    </nav>
     <div class="top-stats">
-      <div class="py-status" id="pyStatus" title="Estado de Python"><span class="dot"></span><span class="txt">Cargando Python…</span></div>
-      <div class="chip streak" id="streakChip" title="Racha de días seguidos">🔥 <b>0</b></div>
-      <div class="chip combo hidden" id="comboChip" title="Aciertos seguidos al primer intento">⚡ x<b>0</b></div>
-      <button class="level-pill" id="levelPill" title="Tu nivel">
-        <span class="lvl-num">1</span>
-        <span class="lvl-info"><span class="lvl-name">Panda bebé</span><span class="xpbar"><i></i></span></span>
-        <span class="xp-txt"><b>0</b> XP</span>
-      </button>
-      <button class="icon-btn" id="soundBtn" title="Sonido" aria-label="Activar o desactivar sonido">🔊</button>
+      <div class="py-status" id="pyStatus" title="Estado de Python en el navegador"><span class="dot"></span><span class="txt">Cargando Python…</span></div>
+      <a class="mast-top" id="mastTop" href="#/progreso" title="Dominio global"></a>
+      <div class="chip streak" id="streakChip" title="Días seguidos practicando">🔥 <b>0</b></div>
       <button class="icon-btn" id="themeBtn" title="Tema claro / oscuro" aria-label="Cambiar tema">🌙</button>
     </div>
   </header>
 
-  <main id="app"></main>
+  <main id="app" tabindex="-1"></main>
 
   <div class="toasts" id="toasts" aria-live="polite"></div>
   <div class="modal hidden" id="modal" role="dialog" aria-modal="true">
@@ -54,8 +55,11 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/comment/comment.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/runmode/runmode.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
   <script src="js/data.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/views.js"></script>
+  <script src="js/exercise.js"></script>
+  <script src="js/quiz.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

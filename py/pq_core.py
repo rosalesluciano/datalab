@@ -62,7 +62,10 @@ def _sort(o, ignore_index):
 
 
 def _tipo(x):
-    nombres = {pd.DataFrame: "un DataFrame", pd.Series: "una Series"}
+    nombres = {pd.DataFrame: "un DataFrame", pd.Series: "una Series", list: "una lista", dict: "un diccionario",
+               tuple: "una tupla", set: "un set", str: "un texto (str)", int: "un entero (int)",
+               float: "un decimal (float)", bool: "un booleano (bool)", type(None): "None (nada)",
+               np.ndarray: "un array de NumPy"}
     return nombres.get(type(x), f"un {type(x).__name__}")
 
 
@@ -82,6 +85,11 @@ def _scalar_eq(u, e):
     if isinstance(e, (list, tuple)) and isinstance(u, (list, tuple, np.ndarray, pd.Index)):
         u = list(u)
         return len(u) == len(e) and all(_scalar_eq(a, b) for a, b in zip(u, e))
+    if isinstance(e, dict):
+        return (isinstance(u, dict) and set(map(str, u)) == set(map(str, e))
+                and all(_scalar_eq(u[k] if k in u else u[str(k)], v) for k, v in e.items()))
+    if isinstance(e, (set, frozenset)):
+        return isinstance(u, (set, frozenset)) and u == e
     try:
         return bool(u == e)
     except Exception:
@@ -169,7 +177,26 @@ def pq_compare(u, e, ordered=True, ignore_index=False):
         return False, f"Tu resultado es {_tipo(u)}, pero se esperaba un valor simple ({type(e).__name__}). ¿Te falta .iloc[0], .sum() o similar?"
     if _scalar_eq(u, e):
         return True, ""
-    return False, f"Tu resultado es {u!r}, pero no es el valor esperado."
+    if u is None:
+        return False, ("Tu resultado es None. ¿Te falta un `return` en la función, o guardaste lo que devuelve "
+                       "un método que modifica en el lugar (como `.sort()` o `.append()`)?")
+    contenedores = (list, tuple, dict, set, str)
+    if isinstance(e, contenedores) and not isinstance(u, type(e)) and not (
+            isinstance(e, (list, tuple)) and isinstance(u, (list, tuple))):
+        return False, f"Tu resultado es {_tipo(u)}, pero se esperaba {_tipo(e)}."
+    if isinstance(e, (list, tuple)) and isinstance(u, (list, tuple)) and len(u) != len(e):
+        return False, f"Tu resultado tiene {len(u)} elementos y se esperaban {len(e)}."
+    if isinstance(e, dict) and isinstance(u, dict) and set(map(str, u)) != set(map(str, e)):
+        faltan = [k for k in e if str(k) not in set(map(str, u))]
+        sobran = [k for k in u if str(k) not in set(map(str, e))]
+        msg = "Las claves del diccionario no coinciden."
+        if faltan:
+            msg += f" Faltan: {faltan}."
+        if sobran:
+            msg += f" Sobran: {sobran}."
+        return False, msg
+    txt = repr(u)
+    return False, f"Tu resultado es {txt[:300] + ('…' if len(txt) > 300 else '')}, pero no es el valor esperado."
 
 
 # ---------------------------------------------------------------- gráficos
@@ -252,14 +279,24 @@ def pq_check(ns, get_expected, opts):
 
 
 _ERR_TIPS = [
-    ("truth value of a Series is ambiguous", "Para combinar condiciones usa & (y), | (o) y pon cada condición entre paréntesis."),
-    ("KeyError", "Revisa que el nombre de la columna esté bien escrito (mayúsculas, tildes, espacios)."),
-    ("NameError", "Estás usando una variable que no existe. ¿Un error de tipeo?"),
-    ("SyntaxError", "Hay un error de sintaxis: revisa paréntesis, comillas y que la línea `resultado = ...` esté completa."),
-    ("AttributeError", "Ese método o atributo no existe para este objeto. Revisa el nombre."),
-    ("TypeError", "Algún tipo de dato no encaja (¿texto mezclado con números?)."),
-    ("IndentationError", "Revisa la sangría (espacios al inicio de la línea)."),
-    ("MergeError", "Revisa las columnas que usas para unir (on / left_on / right_on)."),
+    ("truth value of a Series is ambiguous", "Para combinar condiciones usá & (y), | (o) y poné cada condición entre paréntesis."),
+    ("can't multiply sequence", "Estás multiplicando un texto (str). ¿El número llegó como texto? Convertilo con int() o float()."),
+    ("can only concatenate str", "Estás sumando texto con otra cosa. Convertí con str() para unir textos, o con float() para hacer cuentas."),
+    ("unsupported operand type", "Los dos lados de la operación tienen tipos incompatibles (por ejemplo, int + str o None + float). Revisá type() de cada valor."),
+    ("could not convert string to float", "Hay un texto que no representa un número (por ejemplo 'n/d' o ''). Filtralo o capturá el ValueError con try/except."),
+    ("invalid literal for int", "Hay un texto que no representa un entero. Revisá el valor o usá try/except ValueError."),
+    ("index out of range", "Pediste una posición que no existe. Recordá: las posiciones van de 0 a len()-1, y -1 es el último."),
+    ("values to unpack", "La cantidad de variables a la izquierda no coincide con la cantidad de valores que llegan."),
+    ("ZeroDivisionError", "Dividiste por cero. ¿La lista o el divisor pueden estar vacíos? Verificalo antes de dividir."),
+    ("'NoneType' object", "Un valor es None. Suele pasar con una función sin return o con métodos como .sort() que devuelven None."),
+    ("KeyError", "Esa clave o columna no existe. Revisá mayúsculas, tildes y espacios; con dicts podés usar .get()."),
+    ("NameError", "Usás una variable que no existe (todavía). ¿Error de tipeo o la definiste más abajo?"),
+    ("IndentationError", "Revisá la sangría: el contenido de if, for, def, etc. va con 4 espacios."),
+    ("SyntaxError", "Error de sintaxis: revisá paréntesis, comillas, dos puntos (:) al final de if/for/def y que cada línea esté completa."),
+    ("AttributeError", "Ese método o atributo no existe para este tipo de objeto. Revisá el nombre y qué tipo tiene la variable."),
+    ("MergeError", "Revisá las columnas que usás para unir (on / left_on / right_on)."),
+    ("TypeError", "Algún tipo de dato no encaja con la operación. Revisá type() de las variables involucradas."),
+    ("ValueError", "El tipo es correcto pero el valor no es válido para esta operación."),
 ]
 
 

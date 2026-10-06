@@ -1,0 +1,663 @@
+# -*- coding: utf-8 -*-
+"""Módulo 02 · DataFrames: intuición sobre la estructura de una tabla."""
+from datasets import DF_SETUP, SETUP, TABLES
+from framework import A, B, C, D, E, F, G, P, Q, ask, concept, field, module, project
+
+S1, S2, S3, S4 = "Anatomía de un DataFrame", "Columnas: cada una es una Series", "Índice y selección (loc / iloc)", "Máscaras booleanas por dentro"
+S5, S6, S7, S8 = "Crear, modificar y eliminar columnas", "Ejes: filas vs columnas", "Qué devuelve cada operación", "Reestructurar: ancho y largo"
+S9, S10 = "Relaciones entre DataFrames", "DataFrames y bases de datos SQL"
+SP = "Proyecto: radiografía de clientes"
+
+CONCEPTS = [
+concept("df-estructura", "Estructura: filas, columnas e índice", "shape · index · columns · values",
+    problem="Entender qué estás mirando: un DataFrame es una tabla con **índice** (etiquetas de filas), **columnas** con nombre y **valores**.",
+    when="Cada vez que mirás una tabla o el resultado de una operación.",
+    signals=["Números a la izquierda de la tabla (el índice)", "Te preguntás '¿cuántas filas quedaron?'", "Un resultado que 'se ve raro'"],
+    can=["Medir: `df.shape`", "Ver etiquetas: `df.index`, `df.columns`", "Pensar cada fila como un registro y cada columna como una variable"],
+    cant=["Tener columnas de distinto largo: todas comparten el mismo índice"],
+    nomemo="Lo esencial: **fila = registro**, **columna = variable**, **índice = etiqueta de fila** (no siempre 0, 1, 2…).",
+    ai="«Te pego el resultado de df.head() y df.info(). Describime la estructura: qué representa cada fila, qué columnas hay y de qué tipo.»",
+    verify="Antes de cada operación, predecí el shape del resultado; después comprobalo.",
+    example="""df = pd.DataFrame({"producto": ["Mouse", "Teclado"], "precio": [25.5, 45.0]})
+df.shape      # (2, 2)
+df.index      # RangeIndex(start=0, stop=2)
+df.columns    # Index(['producto', 'precio'])""",
+    check=("En un DataFrame de ventas bien estructurado, ¿qué representa cada fila?", [
+        ("Un registro (una venta)", True, "Cada fila es una observación."),
+        ("Una variable", False, "Las variables son las columnas."),
+        ("Un tipo de dato", False, "No."),
+    ])),
+
+concept("df-columna-series", "Cada columna es una Series", "df['col'] → Series · df[['col']] → DataFrame",
+    problem="Saber qué tipo de objeto obtenés al seleccionar columnas, porque cambia qué métodos podés usar después.",
+    when="Al seleccionar columnas y al leer errores del tipo 'se esperaba un DataFrame'.",
+    signals=["Corchete simple vs doble", "Querés aplicar `.str` o `.dt` (solo en Series)"],
+    can=["Una columna: `df['precio']` (Series)", "Varias: `df[['producto', 'precio']]` (DataFrame)", "Operar una columna entera: `df['precio'] * 1.21`"],
+    cant=["Seleccionar varias columnas con corchete simple: `df['a', 'b']` da KeyError"],
+    nomemo="Simple `[]` → una Series; doble `[[]]` → un DataFrame (una lista de columnas).",
+    ai="«¿Por qué `df[['precio']]` y `df['precio']` se muestran distinto? ¿Cuándo conviene cada uno?»",
+    verify="`type(x)` te dice si es Series o DataFrame.",
+    example="""df["precio"]                 # Series
+df[["producto", "precio"]]   # DataFrame""",
+    check=("¿Qué devuelve `df[['nombre']]`?", [
+        ("Un DataFrame con una columna", True, "La lista dentro de los corchetes pide un DataFrame."),
+        ("Una Series", False, "Eso es df['nombre']."),
+        ("Un error", False, "Es válido."),
+    ])),
+
+concept("df-indice", "El índice", "index · set_index · reset_index",
+    problem="Usar etiquetas de fila con significado (producto, fecha, cliente) para buscar y alinear datos.",
+    when="Querés buscar por una etiqueta, el resultado de un groupby tiene los grupos en el índice, o pandas alineó datos de forma inesperada.",
+    signals=["Buscar 'el precio del Monitor'", "Resultados de groupby", "NaN inesperados al combinar Series"],
+    can=["Convertir una columna en índice: `set_index('producto')`", "Volver el índice a columna: `reset_index()`", "Buscar por etiqueta: `.loc['Monitor']`"],
+    cant=["Evitar la alineación: las operaciones entre Series se emparejan **por índice**, no por posición"],
+    nomemo="Recordá que pandas alinea por índice. Esa sola idea explica muchos NaN 'misteriosos'.",
+    ai="«Después de un groupby, la categoría quedó como índice y no como columna. ¿Por qué pasa y cómo la vuelvo a columna?»",
+    verify="Mirá `df.index` después de cada operación que pueda cambiarlo (groupby, set_index, filtros).",
+    example="""productos.set_index("producto").loc["Monitor", "precio"]   # 300.0
+resumen = df.groupby("categoria")["precio"].mean().reset_index()""",
+    check=("¿Qué hace `reset_index()` sobre el resultado de un groupby?", [
+        ("Convierte el índice (los grupos) en una columna normal", True, "Y deja un índice 0, 1, 2…"),
+        ("Borra los grupos", False, "No borra: los pasa a columna."),
+        ("Ordena los valores", False, "No ordena."),
+    ])),
+
+concept("df-dtypes", "Tipos de las columnas", "dtypes · int64 · float64 · object/str · datetime64 · bool · category",
+    problem="Cada columna tiene **un** tipo, que define qué operaciones son posibles (sumar, `.str`, `.dt`).",
+    when="Al cargar datos y cuando una operación falla o da resultados raros.",
+    signals=["Números que no se suman", "Fechas que no se pueden restar", "Memoria alta en columnas de texto repetido"],
+    can=["Inspeccionar: `df.dtypes`, `df.info()`", "Convertir: `astype`, `to_numeric`, `to_datetime`"],
+    cant=["Tener tipos mezclados sin consecuencias: una sola celda de texto convierte la columna en object"],
+    nomemo="Alcanza con reconocer: int/float = números; object/str = texto; datetime64 = fechas; bool = sí/no.",
+    ai="«df.info() muestra 'edad' como object. ¿Qué significa y cómo encuentro qué valores impiden que sea numérica?»",
+    verify="`df.dtypes` después de cargar y de convertir.",
+    example="""productos.dtypes
+# producto_id int64 · producto object · precio float64 ...""",
+    check=("Una columna de edades aparece como `object`. ¿Qué es lo más probable?", [
+        ("Que tenga al menos un valor de texto (por ejemplo 'n/d')", True, "Un solo texto vuelve la columna object."),
+        ("Que las edades sean decimales", False, "Serían float64."),
+        ("Que esté ordenada", False, "El orden no cambia el tipo."),
+    ])),
+
+concept("df-loc-iloc", "Seleccionar con loc e iloc", "loc[filas, columnas] por etiqueta · iloc por posición",
+    problem="Seleccionar filas **y** columnas a la vez, por etiqueta (`loc`) o por posición (`iloc`).",
+    when="Necesitás un subconjunto preciso: 'filas 2 a 4, columnas producto y precio', 'las últimas 3 filas'.",
+    signals=["Se nombran filas y columnas a la vez", "'las primeras/últimas n'", "Modificar valores de ciertas filas"],
+    can=["Por etiqueta: `df.loc[2:4, ['producto', 'precio']]` (incluye el 4)", "Por posición: `df.iloc[-3:]` (excluye el final)", "Con máscara: `df.loc[df['stock'] == 0, 'precio']`", "Modificar de forma segura: `df.loc[mascara, 'col'] = valor`"],
+    cant=["Usar etiquetas en iloc o posiciones en loc (salvo que coincidan)"],
+    nomemo="loc = **l**abel (etiqueta, incluye el final); iloc = **i**nteger (posición, excluye el final).",
+    ai="«¿Por qué `df.loc[2:4]` devuelve 3 filas y `df.iloc[2:4]` devuelve 2?»",
+    verify="Contá filas y columnas del resultado y compará con lo pedido.",
+    example="""productos.loc[2:4, ["producto", "precio"]]
+clientes.iloc[-3:]
+productos.loc[productos["stock"] == 0, "producto"]""",
+    check=("¿Cuántas filas devuelve `df.loc[2:4]` (índice 0, 1, 2…)?", [
+        ("3 (2, 3 y 4)", True, "loc incluye el extremo final."),
+        ("2", False, "Eso sería iloc[2:4]."),
+        ("4", False, "No."),
+    ])),
+
+concept("df-mascaras", "Máscaras booleanas por dentro", "Series de True/False · sum/mean de máscaras",
+    problem="Entender que un filtro es una **Series de True/False** alineada con las filas, que se puede guardar, combinar, contar y reutilizar.",
+    when="Al filtrar, contar 'cuántos cumplen', calcular proporciones o modificar solo ciertas filas.",
+    signals=["'¿cuántos…?', '¿qué porcentaje…?'", "La misma condición se usa varias veces"],
+    can=["Guardar la condición: `sin_stock = df['stock'] == 0`", "Contar: `sin_stock.sum()`", "Proporción: `sin_stock.mean()`", "Usarla en `loc` para modificar"],
+    cant=["Combinarse con and/or (usar & | ~)"],
+    nomemo="True vale 1 y False vale 0: por eso sum() cuenta y mean() da la proporción.",
+    ai="«¿Por qué `(df['edad'] > 40).mean()` da la proporción de clientes mayores de 40?»",
+    verify="Mirá la máscara: debe tener el mismo largo que el DataFrame.",
+    example="""sin_stock = productos["stock"] == 0
+sin_stock.sum()     # cuántos
+sin_stock.mean()    # qué proporción
+productos[sin_stock]""",
+    check=("¿Qué devuelve `(df['stock'] == 0).sum()`?", [
+        ("La cantidad de filas con stock 0", True, "Cada True suma 1."),
+        ("La suma del stock", False, "Suma True/False, no el stock."),
+        ("Un DataFrame filtrado", False, "Para eso: df[mascara]."),
+    ])),
+
+concept("df-columnas", "Crear, modificar y eliminar columnas", "df['nueva'] = … · assign · drop · rename · loc",
+    problem="Derivar variables nuevas (importe, margen, tramo) y ajustar la tabla (renombrar, descartar).",
+    when="Una pregunta necesita un dato que no está como columna pero se puede calcular.",
+    signals=["'calculá el importe', 'agregá una columna'", "Nombres de columnas poco claros", "Columnas que sobran"],
+    can=["Crear: `df['importe'] = df['cantidad'] * df['precio']`", "Encadenar: `df.assign(importe=...)`", "Eliminar: `drop(columns=[...])`", "Renombrar: `rename(columns={...})`", "Modificar filas específicas: `df.loc[mask, 'col'] = valor`"],
+    cant=["Modificar con asignación encadenada `df[mask]['col'] = x` (no modifica el original)"],
+    nomemo="Para modificar algunas filas, siempre `loc[mascara, columna]`.",
+    ai="«Quiero aplicar un 10% de descuento solo a los productos de Accesorios. ¿Por qué `df[df['categoria']=='Accesorios']['precio'] *= 0.9` no funciona?»",
+    verify="Mirá algunas filas antes y después; compará shape y columnas.",
+    example="""df["importe"] = df["cantidad"] * df["precio"]
+df.loc[df["categoria"] == "Accesorios", "precio"] *= 0.9
+df.drop(columns=["estado"]).rename(columns={"cantidad": "unidades"})""",
+    check=("¿Cuál es la forma segura de cambiar el precio solo de ciertas filas?", [
+        ("`df.loc[mascara, 'precio'] = nuevo`", True, "Selección y asignación en un solo paso sobre el original."),
+        ("`df[mascara]['precio'] = nuevo`", False, "Asignación encadenada: modifica una copia."),
+        ("`df['precio'][mascara] = nuevo`", False, "También es encadenada."),
+    ])),
+
+concept("df-transformar", "Transformar valores", "operaciones vectorizadas · map · apply · pd.cut · np.where",
+    problem="Convertir valores en otros: traducir códigos, clasificar en tramos, aplicar reglas.",
+    when="Una columna nueva depende de otra mediante una regla.",
+    signals=["'traducí', 'clasificá en tramos', 'según el valor'"],
+    can=["Vectorizado (preferido): `df['p'] * 1.21`", "Traducir con diccionario: `map({...})`", "Tramos: `pd.cut(bins, labels)`", "Regla propia: `apply(funcion)`"],
+    cant=["Ser rápido con apply en tablas enormes (es un loop disfrazado)"],
+    nomemo="Orden de preferencia: vectorizado → map/cut/where → apply.",
+    ai="«Quiero clasificar edades en joven/adulto/senior. ¿Conviene apply con if o pd.cut? ¿Por qué?»",
+    verify="value_counts() de la columna nueva: ¿los tramos tienen sentido?",
+    example="""df["talle"].map({"S": "Chico", "M": "Mediano"})
+pd.cut(df["edad"], bins=[0, 29, 44, 120], labels=["joven", "adulto", "senior"])""",
+    check=("¿Qué pasa con `map(diccionario)` si un valor no está en el diccionario?", [
+        ("Queda NaN", True, "Por eso hay que verificar que el diccionario cubra todos los casos."),
+        ("Queda igual", False, "No: queda NaN."),
+        ("Da error", False, "No da error."),
+    ])),
+
+concept("df-axis", "Ejes: axis=0 y axis=1", "axis=0 (a lo largo de filas → por columna) · axis=1 (por fila)",
+    problem="Elegir la dirección de una operación: resumir cada columna o resumir cada fila.",
+    when="Sumar trimestres de cada tienda (por fila) vs promediar cada trimestre (por columna).",
+    signals=["'total de cada fila'", "'promedio de cada columna'", "drop de filas o columnas"],
+    can=["Por columna (default): `df.sum()`", "Por fila: `df.sum(axis=1)`"],
+    cant=["Adivinar qué eje querés: hay que pensar qué representa cada resultado"],
+    nomemo="axis=0 colapsa las filas (queda un valor por columna); axis=1 colapsa las columnas (queda un valor por fila).",
+    ai="«Tengo tiendas en filas y trimestres en columnas. ¿Qué axis uso para el total anual de cada tienda?»",
+    verify="Predecí el largo del resultado: ¿uno por fila o uno por columna?",
+    example="""t = trimestral.set_index("tienda")
+t.sum(axis=1)   # total de cada tienda
+t.mean()        # promedio de cada trimestre""",
+    check=("Con tiendas en filas y trimestres en columnas, ¿qué da `df.sum(axis=1)`?", [
+        ("El total de cada tienda", True, "Suma a lo largo de las columnas: un valor por fila."),
+        ("El total de cada trimestre", False, "Eso es axis=0."),
+        ("Un solo número", False, "No."),
+    ])),
+
+concept("df-forma-resultado", "Qué devuelve cada operación", "agregación vs transform · Series vs DataFrame · rank",
+    problem="Predecir la **forma** del resultado: ¿una fila por grupo o una por registro?, ¿Series o DataFrame?",
+    when="Antes de usar un resultado en el paso siguiente (asignarlo como columna, unirlo, graficarlo).",
+    signals=["NaN al asignar un resultado de groupby como columna", "'comparar cada fila con su grupo'", "'ranking dentro de cada grupo'"],
+    can=["Agregar (una fila por grupo): `groupby().mean()`", "Transformar (una fila por registro): `groupby().transform('mean')`", "Rankear dentro del grupo: `groupby().rank()`"],
+    cant=["Asignar directamente una agregación como columna: los índices no coinciden"],
+    nomemo="Pregunta clave: ¿el resultado tiene tantas filas como el original o como grupos?",
+    ai="«Quiero agregar a cada empleado la media salarial de su departamento. ¿Por qué con groupby().mean() me salen NaN y qué uso en su lugar?»",
+    verify="Compará `len(resultado)` con `len(df)` y con la cantidad de grupos.",
+    example="""df.groupby("depto")["salario"].mean()           # 1 fila por depto
+df.groupby("depto")["salario"].transform("mean") # 1 fila por empleado""",
+    check=("¿Cuántas filas tiene `empleados.groupby('depto')['salario'].transform('mean')`?", [
+        ("Tantas como empleados", True, "transform devuelve un valor por registro original."),
+        ("Una por departamento", False, "Eso hace la agregación (mean)."),
+        ("Una sola", False, "No."),
+    ])),
+
+concept("df-reshape", "Reestructurar: formato ancho y largo", "pivot_table · melt",
+    problem="Cambiar la forma de la tabla: de 'una columna por trimestre' (ancho) a 'una fila por tienda y trimestre' (largo), o al revés.",
+    when="Para reportes (ancho, tipo Excel) o para graficar/agrupar (largo).",
+    signals=["Columnas que son valores de una variable (Q1, Q2, Q3)", "'tabla cruzada', 'tabla dinámica'"],
+    can=["Ancho → largo: `melt(id_vars=..., var_name=..., value_name=...)`", "Largo → ancho con agregación: `pivot_table(index, columns, values, aggfunc)`"],
+    cant=["Elegir por vos qué forma necesita el paso siguiente"],
+    nomemo="Pensá en la forma de destino; la función se busca.",
+    ai="«Tengo ventas con columnas Q1, Q2, Q3 por tienda y quiero graficarlas con seaborn. ¿Qué forma necesito y cómo la obtengo?»",
+    verify="Largo: filas = tiendas × trimestres. Ancho: una fila por categoría del índice.",
+    example="""largo = trimestral.melt(id_vars="tienda", var_name="trimestre", value_name="ventas")
+pd.pivot_table(df, index="estado", columns="categoria", values="cantidad", aggfunc="sum")""",
+    check=("Una tabla con columnas tienda, Q1, Q2, Q3 está en formato…", [
+        ("Ancho", True, "Los trimestres (valores de una variable) son columnas."),
+        ("Largo", False, "Largo tendría una columna 'trimestre'."),
+        ("Ninguno", False, "No."),
+    ])),
+
+concept("df-relaciones", "Relaciones entre DataFrames", "claves · 1:1 · 1:N · N:M · tipos de join",
+    problem="Entender cómo se relacionan las tablas (un cliente tiene muchos pedidos) para combinarlas sin perder ni multiplicar filas.",
+    when="Antes de cualquier merge, y al interpretar conteos después de unir.",
+    signals=["Columnas *_id", "Conteos que crecen después de un merge", "Registros 'huérfanos' (pedido de cliente inexistente)"],
+    can=["Identificar claves y cardinalidad", "Elegir inner/left/outer según qué filas conservar", "Validar: `merge(..., validate='many_to_one')`", "Contar relaciones (pedidos por cliente, incluidos los 0)"],
+    cant=["Detectar solo un error de relación: hay que comparar tamaños"],
+    nomemo="Preguntas: ¿cuál es la clave?, ¿cuántos de un lado por cada uno del otro?, ¿qué hago con los sin pareja?",
+    ai="«Clientes y pedidos se relacionan por cliente_id (un cliente, muchos pedidos). ¿Cómo cuento los pedidos por cliente incluyendo a los que no compraron?»",
+    verify="Tamaño esperado después del merge según la cardinalidad; buscá NaN que indiquen huérfanos.",
+    example="""df = vendedores.merge(ventas, on="vendedor_id", how="left")
+df.groupby("vendedor")["venta_id"].count()   # count ignora NaN → 0 para quien no vendió""",
+    check=("Clientes (12 filas) y pedidos (30 filas, todos de clientes existentes). ¿Cuántas filas tiene `pedidos.merge(clientes, on='cliente_id')`?", [
+        ("30: cada pedido encuentra exactamente un cliente", True, "Relación N:1."),
+        ("12", False, "Cada pedido es una fila."),
+        ("360", False, "Eso sería un producto cartesiano."),
+    ])),
+
+concept("df-sql", "DataFrames y SQL", "read_sql · to_sql · parámetros",
+    problem="Traer datos de una base de datos a un DataFrame (y guardar resultados), combinando lo mejor de SQL y pandas.",
+    when="Los datos viven en una base de datos (lo habitual en empresas).",
+    signals=["'está en la base de datos'", "Tablas enormes que conviene filtrar antes de traer", "Valores que vienen de un usuario (parámetros)"],
+    can=["Consultar: `pd.read_sql(consulta, conn)`", "Parámetros seguros: `params=(valor,)`", "Guardar: `df.to_sql('tabla', conn)`"],
+    cant=["Armar consultas pegando texto del usuario sin riesgo (inyección SQL): usá parámetros"],
+    nomemo="Filtrá/agregá en SQL lo que reduce mucho los datos; el análisis flexible, en pandas.",
+    ai="«¿Por qué no debería armar la consulta con un f-string con el valor que ingresa el usuario? Mostrame la versión con parámetros.»",
+    verify="Compará el resultado del SQL con el equivalente en pandas sobre las mismas tablas.",
+    example="""pd.read_sql("SELECT nombre FROM clientes WHERE edad > ?", conn, params=(40,))""",
+    check=("¿Por qué usar `params` en lugar de un f-string en la consulta?", [
+        ("Para evitar inyección SQL y errores de comillas", True, "La librería escapa el valor."),
+        ("Porque es más rápido de escribir", False, "No es el motivo."),
+        ("Porque read_sql no acepta f-strings", False, "Los acepta, pero es inseguro."),
+    ])),
+]
+
+EXERCISES = [
+# ======================================================================== S1
+A("df-a01", S1, "Leer la estructura", 1, ["df-estructura"],
+  "Mirás una tabla de pedidos con 30 filas y columnas `pedido_id, cliente_id, producto_id, cantidad, fecha, estado`. ¿Qué representa **una fila**?",
+  [("Un pedido", True, "Cada fila es un registro/observación."),
+   ("Un cliente", False, "Un cliente puede aparecer en varias filas."),
+   ("Una columna de fechas", False, "No."),
+   ("Un producto", False, "Un producto puede estar en muchos pedidos.")]),
+
+P("pd12", S1, ["df-estructura", "df-columna-series"],
+  ["Pensá la tabla como columnas con nombre.", "Un diccionario donde cada clave es una columna y cada valor su lista de datos.", "Todas las listas deben tener el mismo largo."],
+  "Un DataFrame se arma con un diccionario de listas: cada clave es una columna y cada lista sus valores (filas).",
+  "resultado ← DataFrame con columnas jugador = [...] y goles = [...]",
+  problem="Creá un DataFrame con la columna `jugador` (`Messi, Ronaldo, Mbappé`) y la columna `goles` (`30, 25, 28`), en ese orden.", level=1),
+
+P("pd13", S1, ["df-estructura"],
+  ["Querés filas y columnas en una sola respuesta.", "Es un atributo, no un método.", "Devuelve una tupla (filas, columnas)."],
+  "`shape` devuelve la tupla (filas, columnas). Es un atributo: va sin paréntesis.",
+  "resultado ← tamaño (filas, columnas) de clientes",
+  problem="¿Qué tamaño tiene la tabla `clientes` (filas y columnas)? Guardalo en `resultado`.", level=1),
+
+P("pd15", S1, ["df-estructura", "df-dtypes"],
+  ["Querés los nombres de las columnas.", "El DataFrame tiene un atributo con esos nombres.", "Convertilo a una lista normal de Python."],
+  "`df.columns` contiene los nombres de columna como un Index; `list()` lo convierte en lista.",
+  "resultado ← lista de nombres de columnas de pedidos",
+  problem="Guardá en `resultado` una **lista** con los nombres de las columnas de `pedidos`.", level=1),
+
+B("df-b01", S1, "Describir una tabla sin verla entera", 2, ["df-estructura", "df-dtypes"],
+  "Un colega te pasa esta salida de `df.info()`:\n\n```\nRangeIndex: 12 entries, 0 to 11\n cliente_id      12 non-null int64\n nombre          12 non-null object\n edad            12 non-null int64\n email            9 non-null object\n fecha_registro  12 non-null datetime64[ns]\n```\n\n**Describí con tus palabras qué hay en la tabla y qué te llama la atención.**",
+  model="Es una tabla de **12 clientes** (una fila por cliente) con 5 columnas: un id entero, el nombre (texto), la edad (entero), el email (texto) y la fecha de registro (fecha). Lo llamativo: **email tiene solo 9 valores no nulos**, así que faltan 3 emails. Los tipos parecen correctos (la fecha ya es datetime, la edad es numérica).",
+  checklist=["Dije cuántas filas y qué representa cada una", "Nombré las columnas y sus tipos", "Detecté que faltan 3 emails", "Comenté si los tipos son adecuados"],
+  hints=["¿Qué te dice 'RangeIndex: 12 entries'?", "Compará los 'non-null' de cada columna.", "¿Algún tipo te parece incorrecto?"]),
+
+# ======================================================================== S2
+A("df-a02", S2, "Corchete simple o doble", 1, ["df-columna-series"],
+  "Necesitás pasar a una función **un DataFrame** con solo la columna `precio`. ¿Qué escribís?",
+  [("`df[['precio']]`", True, "Con lista → DataFrame de una columna."),
+   ("`df['precio']`", False, "Eso es una Series."),
+   ("`df.precio()`", False, "precio no es un método."),
+   ("`df(['precio'])`", False, "Sintaxis inválida.")]),
+
+P("df01", S2, ["df-columna-series"],
+  ["Querés varias columnas y que el resultado siga siendo una tabla.", "Se pasa una lista de nombres dentro de los corchetes.", "Doble corchete: `df[[ ... ]]`."],
+  "Al pasar una lista de columnas se obtiene un DataFrame con esas columnas en el orden indicado.",
+  "resultado ← clientes con solo las columnas ['nombre', 'ciudad']",
+  problem="Para una lista de contactos necesitás solo el `nombre` y la `ciudad` de cada cliente, en ese orden. Guardá el DataFrame en `resultado`."),
+
+E("df-e01", S2, "Dos columnas, un corchete", 1, ["df-columna-series"],
+  "Este código intenta quedarse con las columnas `producto` y `precio`, pero falla. Corregilo.",
+  "resultado = productos['producto', 'precio']",
+  "resultado = productos[['producto', 'precio']]",
+  detect=("¿Por qué falla?", [
+      ("Con corchete simple pandas busca UNA columna llamada ('producto', 'precio')", True, "Para varias columnas hay que pasar una lista: doble corchete."),
+      ("La columna precio no existe", False, "Existe."),
+      ("No se pueden seleccionar dos columnas", False, "Sí, con una lista."),
+  ]),
+  why="`df['a', 'b']` interpreta `('a', 'b')` como el nombre de **una** columna (una tupla) → `KeyError`. Para varias columnas hay que pasar una **lista**: `df[['a', 'b']]`.",
+  hints=["Leé el KeyError: ¿qué nombre de columna busca?", "¿Cómo se le pasan varias cosas a la vez a los corchetes?", "Una lista de nombres entre los corchetes."],
+  pseudo="resultado ← productos[[lista de columnas]]"),
+
+# ======================================================================== S3
+P("pd03", S3, ["df-loc-iloc", "df-indice"],
+  ["Un valor se pide por etiqueta y el otro por posición.", "Hay un selector para etiquetas y otro para posiciones.", "loc = etiqueta, iloc = posición (0 es la primera)."],
+  "`loc` busca por la etiqueta del índice ('Mié') e `iloc` por la posición (0 = primer día).",
+  "resultado ← [ventas por etiqueta 'Mié', ventas en posición 0]",
+  problem="Con la Series `ventas`, guardá en `resultado` una **lista** con dos valores: las ventas del **Mié** (buscando por etiqueta) y las del **primer día** (buscando por posición)."),
+
+P("df02", S3, ["df-loc-iloc"],
+  ["Se piden filas por su etiqueta y columnas por nombre a la vez.", "loc acepta `[filas, columnas]`.", "Con loc, el rango 2:4 incluye el 4."],
+  "`loc[2:4, ['producto', 'precio']]` selecciona por etiqueta las filas 2, 3 y 4 (incluye el final) y las dos columnas.",
+  "resultado ← productos.loc[filas 2 a 4, columnas producto y precio]",
+  problem="De `productos`, tomá las filas con índice **2 a 4 (incluido)** y solo las columnas `producto` y `precio`."),
+
+P("df03", S3, ["df-loc-iloc"],
+  ["'Las últimas 3' es una cuestión de posición, no de etiqueta.", "iloc acepta posiciones negativas.", "Con slicing: desde -3 hasta el final."],
+  "`iloc[-3:]` selecciona por posición las tres últimas filas, sin importar las etiquetas.",
+  "resultado ← clientes.iloc[últimas 3 posiciones]",
+  problem="Guardá en `resultado` los **3 últimos clientes** de la tabla (por posición)."),
+
+P("df04", S3, ["df-indice", "df-loc-iloc"],
+  ["Querés buscar por el nombre del producto, no por número de fila.", "Si el nombre fuera el índice, podrías usar loc directo.", "set_index('producto') y después loc[etiqueta, columna]."],
+  "Al convertir `producto` en índice, se puede buscar por etiqueta con `loc['Monitor', 'precio']` y obtener un número.",
+  "tabla ← productos con 'producto' como índice\nresultado ← tabla.loc['Monitor', 'precio']",
+  problem="¿Cuál es el `precio` del producto **Monitor**? Guardá el número (no una tabla) en `resultado`."),
+
+D("df-d01", S3, "Ficha de dos productos", 3, ["df-indice", "df-loc-iloc"],
+  "Armá una tabla con el `precio` y el `stock` de **Laptop** y **Tablet**, con el nombre del producto como índice. Guardala en `resultado`.",
+  "resultado = ",
+  "resultado = productos.set_index('producto').loc[['Laptop', 'Tablet'], ['precio', 'stock']]",
+  ["¿Por qué columna conviene indexar para buscar por nombre?", "Con el nombre como índice, loc acepta listas de etiquetas en filas y en columnas.", "`set_index(...)` y después `.loc[[filas], [columnas]]`."],
+  "Se pone el nombre del producto como índice y se seleccionan con loc dos etiquetas de fila y dos columnas: el resultado es un DataFrame 2×2.",
+  "tabla ← productos indexada por producto\nresultado ← tabla.loc[['Laptop', 'Tablet'], ['precio', 'stock']]"),
+
+E("df-e02", S3, "iloc con una etiqueta", 2, ["df-loc-iloc"],
+  "Este código quiere el precio del Monitor con el producto como índice, pero falla. Corregilo.",
+  "tabla = productos.set_index('producto')\nresultado = tabla.iloc['Monitor', 'precio']",
+  "tabla = productos.set_index('producto')\nresultado = tabla.loc['Monitor', 'precio']",
+  detect=("¿Qué está mal?", [
+      ("iloc solo acepta posiciones numéricas; para etiquetas es loc", True, "iloc = integer location."),
+      ("set_index no funciona", False, "Funciona."),
+      ("Monitor no existe", False, "Existe."),
+  ]),
+  why="`iloc` selecciona por **posición** (enteros). 'Monitor' y 'precio' son **etiquetas**, así que hay que usar `loc`. El error es un TypeError/ValueError sobre el tipo de indexador.",
+  hints=["¿Qué tipo de valores recibe iloc?", "'Monitor' es una etiqueta o una posición?", "¿Qué selector trabaja con etiquetas?"],
+  pseudo="resultado ← tabla.loc['Monitor', 'precio']"),
+
+# ======================================================================== S4
+A("df-a03", S4, "¿Qué devuelve una comparación?", 1, ["df-mascaras"],
+  "¿Qué devuelve `clientes['edad'] > 40`?",
+  [("Una Series de True/False, una por cliente", True, "Es la máscara: todavía no filtra nada."),
+   ("Los clientes mayores de 40", False, "Para eso hay que usarla entre corchetes: clientes[mascara]."),
+   ("Un número", False, "No."),
+   ("Un error", False, "Es válido.")]),
+
+D("df-d02", S4, "¿Qué proporción no tiene stock?", 2, ["df-mascaras"],
+  "¿Qué **proporción** de productos tiene stock en 0? Guardá el número (entre 0 y 1) en `resultado`.",
+  "resultado = ",
+  "resultado = (productos['stock'] == 0).mean()",
+  ["Primero armá la pregunta como máscara.", "La máscara tiene True donde el stock es 0.", "¿Qué estadística de una máscara da la proporción de True?"],
+  "La máscara vale True (1) donde el stock es 0; su promedio es la proporción de productos sin stock.",
+  "máscara ← stock == 0\nresultado ← promedio de la máscara",
+  verify="Hay 2 productos sin stock de 10: 0.2."),
+
+# ======================================================================== S5
+P("df11", S5, ["df-columnas"],
+  ["El dato que se pide no existe como columna, pero se puede calcular.", "Las operaciones entre columnas se hacen fila por fila automáticamente.", "Asigná el resultado a una columna nueva con `df['nueva'] = ...`."],
+  "Se crea una columna nueva multiplicando dos columnas existentes (operación vectorizada, fila por fila).",
+  "productos['valor_stock'] ← precio × stock\nresultado ← productos",
+  problem="¿Cuánto dinero hay inmovilizado en inventario? Agregá a `productos` la columna `valor_stock` = `precio × stock` y guardá el DataFrame completo en `resultado`."),
+
+G("df-g01", S5, "Transferencia: precio con IVA y margen", 3, ["df-columnas"], "df11",
+  "Antes creaste una columna con una operación entre dos columnas. Ahora vas a crear **dos** columnas, y una depende de la otra.",
+  "Agregá a `productos` la columna `precio_iva` (precio × 1.21) y la columna `iva` (precio_iva − precio). Guardá en `resultado` las columnas `producto`, `precio`, `precio_iva` e `iva`.",
+  "resultado = ",
+  "productos['precio_iva'] = productos['precio'] * 1.21\nproductos['iva'] = productos['precio_iva'] - productos['precio']\nresultado = productos[['producto', 'precio', 'precio_iva', 'iva']]",
+  ["¿En qué orden tenés que crear las columnas?", "La segunda columna usa la primera: creala después.", "Al final, seleccioná solo las 4 columnas pedidas con doble corchete."],
+  "Mismo patrón (columna = operación entre columnas), pero encadenado: la segunda columna se calcula a partir de la primera.",
+  "precio_iva ← precio × 1.21\niva ← precio_iva − precio\nresultado ← columnas [producto, precio, precio_iva, iva]"),
+
+P("df13", S5, ["df-columnas"],
+  ["Son dos cambios de estructura: quitar una columna y cambiar un nombre.", "Hay un método para eliminar columnas y otro para renombrarlas.", "drop(columns=[...]) y rename(columns={viejo: nuevo}), encadenados."],
+  "`drop(columns=...)` elimina la columna y `rename(columns={...})` cambia el nombre; ambos devuelven un DataFrame nuevo y se pueden encadenar.",
+  "resultado ← pedidos sin 'estado' y con 'cantidad' renombrada a 'unidades'",
+  problem="Preparando un reporte de `pedidos`: eliminá la columna `estado` y renombrá `cantidad` como `unidades`."),
+
+E("df-e03", S5, "El descuento que no se aplicó", 3, ["df-columnas", "df-loc-iloc"],
+  "Querías aplicar un **10% de descuento** solo a los productos de la categoría Accesorios, pero los precios siguen igual. Corregilo.",
+  "productos[productos['categoria'] == 'Accesorios']['precio'] = productos['precio'] * 0.9\nresultado = productos",
+  "productos.loc[productos['categoria'] == 'Accesorios', 'precio'] = productos['precio'] * 0.9\nresultado = productos",
+  detect=("¿Por qué no cambian los precios?", [
+      ("Es una asignación encadenada: se modifica una copia filtrada, no la tabla original", True, "Hay que seleccionar filas y columna en un solo paso con loc."),
+      ("0.9 no es un 10% de descuento", False, "Multiplicar por 0.9 sí es un 10% de descuento."),
+      ("La categoría está mal escrita", False, "'Accesorios' es correcta."),
+  ]),
+  why="`df[mascara]['precio'] = …` encadena dos selecciones: la primera crea una **copia** filtrada y la asignación modifica esa copia, que se descarta. pandas avisa con `SettingWithCopyWarning`/`ChainedAssignmentError`. La forma correcta es un único `loc[mascara, 'precio']`.",
+  hints=["Mirá los precios de los Accesorios después de ejecutar: ¿cambiaron?", "¿Cuántos pares de corchetes hay seguidos a la izquierda del `=`?", "¿Qué selector permite elegir filas y columna en una sola operación?"],
+  pseudo="productos.loc[categoría == 'Accesorios', 'precio'] ← precio × 0.9"),
+
+P("df12", S5, ["df-transformar", "df-columnas"],
+  ["Hay que convertir un número (edad) en una categoría (tramo).", "Definí los cortes: ¿hasta qué edad es cada tramo?", "pd.cut recibe los bordes (bins) y los nombres (labels)."],
+  "`pd.cut` asigna cada edad a un intervalo según los bordes indicados: (0, 29], (29, 44], (44, 120].",
+  "rango_edad ← clasificar edad en (0-29] joven, (29-44] adulto, (44-120] senior\nresultado ← columnas nombre, edad, rango_edad",
+  problem="Clasificá a los clientes en tramos de edad: **joven** (hasta 29), **adulto** (30 a 44) y **senior** (45 o más), en una columna nueva `rango_edad`. Guardá solo `nombre`, `edad` y `rango_edad`."),
+
+P("pd09", S5, ["df-transformar"],
+  ["Cada código tiene una traducción fija.", "Una estructura de Python guarda pares código → traducción.", "Series.map(diccionario) reemplaza cada valor según el diccionario."],
+  "`map` reemplaza cada valor por su traducción en el diccionario (los que no estén quedarían NaN).",
+  "resultado ← talles traducidos con {'S': 'Chico', 'M': 'Mediano', 'L': 'Grande'}",
+  problem="Traducí los talles de `talles`: `S` → `Chico`, `M` → `Mediano`, `L` → `Grande`."),
+
+P("pd10", S5, ["df-transformar", "py-func", "py-if"],
+  ["La regla tiene tres tramos con bordes: pensalos primero en una recta numérica.", "Una función con if/elif/else clasifica UNA temperatura.", "Después apply aplica esa función a cada valor."],
+  "Se define una función que clasifica un valor y `apply` la aplica a cada elemento de la Series. Es flexible, pero más lento que las opciones vectorizadas.",
+  "función clasificar(t):\n    si t < 20 → 'frío'; si t ≤ 25 → 'templado'; si no → 'calor'\nresultado ← temperaturas.apply(clasificar)",
+  problem="Clasificá cada valor de `temperaturas` como **frío** (menor que 20), **templado** (entre 20 y 25, ambos incluidos) o **calor** (mayor que 25), usando una función propia aplicada a la Series."),
+
+A("df-a04", S5, "Vectorizado o apply", 2, ["df-transformar"],
+  "Necesitás calcular `precio × 1.21` para una columna de 2 millones de filas. ¿Qué opción conviene?",
+  [("La operación vectorizada `df['precio'] * 1.21`", True, "Es la más rápida y clara."),
+   ("`apply(lambda x: x * 1.21)`", False, "Funciona, pero es un loop disfrazado: mucho más lento."),
+   ("Un for con iterrows", False, "Es la opción más lenta."),
+   ("map con un diccionario", False, "No tiene sentido para una fórmula.")]),
+
+# ======================================================================== S6
+A("df-a05", S6, "¿Qué eje?", 2, ["df-axis"],
+  "En `trimestral` cada fila es una tienda y las columnas Q1, Q2, Q3 son trimestres. Querés el **total anual de cada tienda**. ¿Qué operación?",
+  [("Sumar con `axis=1` (a lo largo de las columnas)", True, "Un valor por fila (tienda)."),
+   ("Sumar con `axis=0`", False, "Daría un total por trimestre."),
+   ("groupby('Q1')", False, "No."),
+   ("melt", False, "Cambia la forma, no suma.")]),
+
+D("df-d03", S6, "Total anual por tienda", 3, ["df-axis", "df-indice"],
+  "A partir de `trimestral`, calculá el **total de ventas de cada tienda** (Q1 + Q2 + Q3), con el nombre de la tienda como índice. Guardá la Series en `resultado`.",
+  "print(trimestral)\n\nresultado = ",
+  "resultado = trimestral.set_index('tienda').sum(axis=1)",
+  ["Querés un valor por fila: ¿qué eje?", "La columna tienda es texto: si la dejás, molesta en la suma. ¿Y si la pasás al índice?", "set_index('tienda') y después sum(axis=1)."],
+  "Se pasa la tienda al índice (para que solo queden columnas numéricas y el resultado esté etiquetado) y se suma por fila con axis=1.",
+  "tabla ← trimestral con tienda como índice\nresultado ← suma de cada fila (axis=1)"),
+
+G("df-g02", S6, "Transferencia: promedio de cada trimestre", 3, ["df-axis"], "df-d03",
+  "Antes resumiste **cada fila** (tienda). Ahora querés resumir **cada columna** (trimestre).",
+  "Calculá el **promedio de ventas de cada trimestre** (Q1, Q2, Q3) entre las tiendas. Guardá la Series en `resultado`.",
+  "resultado = ",
+  "resultado = trimestral.set_index('tienda').mean()",
+  ["¿Qué cambia: la operación o la dirección?", "Querés un valor por columna.", "¿Cuál es el eje por defecto de mean()?"],
+  "Misma tabla, otra dirección: con el eje por defecto (axis=0) se obtiene un valor por columna (trimestre).",
+  "tabla ← trimestral con tienda como índice\nresultado ← promedio de cada columna (axis=0)"),
+
+# ======================================================================== S7
+A("df-a06", S7, "Predecir la forma", 2, ["df-forma-resultado"],
+  "`empleados` tiene 10 filas y 4 departamentos. ¿Cuántas filas tiene `empleados.groupby('depto')['salario'].mean()`?",
+  [("4: una por departamento", True, "Una agregación devuelve una fila por grupo."),
+   ("10", False, "Eso pasaría con transform."),
+   ("1", False, "Sería el promedio general."),
+   ("40", False, "No.")]),
+
+P("df21", S7, ["df-forma-resultado", "df-mascaras"],
+  ["Cada empleado se compara con un valor de SU grupo.", "Necesitás la media del depto repetida en cada fila (mismo largo que empleados).", "groupby(...).transform('mean') devuelve un valor por fila; después comparás y filtrás."],
+  "`transform('mean')` devuelve, para cada empleado, la media de su departamento (una Series del mismo largo), que se puede comparar fila a fila con su salario.",
+  "media_depto ← media de salario de su depto (una por fila, con transform)\nresultado ← empleados donde salario > media_depto",
+  problem="¿Qué empleados cobran **más que la media de su propio departamento**? Guardalos en `resultado`."),
+
+E("df-e04", S7, "La columna llena de NaN", 3, ["df-forma-resultado", "df-indice"],
+  "Querías agregar a cada empleado la media salarial de su departamento, pero la columna nueva sale llena de NaN. Corregilo.",
+  "empleados['media_depto'] = empleados.groupby('depto')['salario'].mean()\nresultado = empleados[['nombre', 'depto', 'salario', 'media_depto']]",
+  "empleados['media_depto'] = empleados.groupby('depto')['salario'].transform('mean')\nresultado = empleados[['nombre', 'depto', 'salario', 'media_depto']]",
+  detect=("¿Por qué salen NaN?", [
+      ("La agregación tiene los deptos como índice, que no coinciden con el índice 0-9 de empleados", True, "pandas alinea por índice al asignar."),
+      ("mean no funciona con salarios", False, "Funciona."),
+      ("Falta dropna", False, "No es un problema de nulos de origen."),
+  ]),
+  why="`groupby().mean()` devuelve **una fila por departamento**, con índice 'Dirección', 'IT'… Al asignarla como columna, pandas alinea por índice (0…9) y ninguna etiqueta coincide → NaN. `transform('mean')` devuelve un valor **por empleado**, con el mismo índice.",
+  hints=["Imprimí `empleados.groupby('depto')['salario'].mean()`: ¿qué índice tiene?", "¿Con qué criterio pandas pone valores en una columna nueva?", "¿Qué variante de groupby devuelve una fila por registro original?"],
+  pseudo="media_depto ← groupby(depto)[salario].transform('mean')"),
+
+P("df30", S7, ["df-forma-resultado", "pd-ordenar"],
+  ["El ranking es dentro de cada departamento, no global.", "Agrupá y rankeá: rank devuelve un valor por fila.", "rank(method='dense', ascending=False): 1 = el que más cobra."],
+  "`groupby('depto')['salario'].rank(...)` calcula la posición de cada salario dentro de su departamento y devuelve una fila por empleado.",
+  "ranking ← posición del salario dentro de su depto (dense, descendente)\nresultado ← columnas nombre, depto, salario, ranking",
+  problem="Agregá a `empleados` la columna `ranking` con la posición del salario **dentro de su depto** (1 = el que más cobra; empates con método `dense`). Guardá `nombre`, `depto`, `salario` y `ranking`."),
+
+B("df-b02", S7, "¿Por qué reset_index?", 2, ["df-forma-resultado", "df-indice"],
+  "Después de `df.groupby('categoria')['precio'].mean()` querés unir ese resultado con otra tabla por la columna `categoria`, y te dicen que primero hagas `reset_index()`. **Explicá por qué.**",
+  model="El resultado del groupby es una **Series cuyo índice son las categorías**: `categoria` ya no es una columna. Para hacer `merge(on='categoria')` hace falta que sea una columna. `reset_index()` convierte el índice en una columna normal (y deja un índice 0, 1, 2…), devolviendo un DataFrame con `categoria` y `precio`.",
+  checklist=["Dije que después del groupby la categoría queda en el índice", "Dije que merge(on=...) necesita una columna", "Expliqué que reset_index la vuelve columna", "Mencioné que el resultado pasa a ser un DataFrame"],
+  hints=["Imprimí el resultado del groupby: ¿dónde están las categorías?", "¿Qué necesita merge en el parámetro on?", "¿Qué hace reset_index con el índice?"]),
+
+# ======================================================================== S8
+A("df-a07", S8, "Ancho o largo", 2, ["df-reshape"],
+  "Para graficar con seaborn las ventas por trimestre de cada tienda, necesitás una columna `trimestre` y una columna `ventas`. Tu tabla tiene columnas Q1, Q2, Q3. ¿Qué operación necesitás?",
+  [("melt (de ancho a largo)", True, "Convierte columnas en valores de una columna."),
+   ("pivot_table", False, "Va de largo a ancho."),
+   ("merge", False, "No combina otra tabla."),
+   ("dropna", False, "No.")]),
+
+P("df26", S8, ["df-reshape", "pd-combinar"],
+  ["El resultado es una tabla cruzada: filas = estado, columnas = categoría.", "Primero necesitás la categoría en cada pedido (merge).", "pivot_table(index, columns, values, aggfunc, fill_value)."],
+  "Tras traer la categoría con merge, `pivot_table` cruza estado (filas) × categoría (columnas) sumando cantidad; `fill_value=0` rellena las combinaciones sin pedidos.",
+  "df ← merge(pedidos, productos)\nresultado ← tabla cruzada estado × categoría con suma de cantidad (huecos = 0)",
+  problem="Armá una tabla cruzada con `estado` en las filas, `categoria` en las columnas y la **suma de `cantidad`** (los huecos deben ser 0)."),
+
+P("df27", S8, ["df-reshape"],
+  ["Los trimestres (Q1, Q2, Q3) son columnas y deberían ser valores.", "La columna que identifica cada fila (tienda) se mantiene.", "melt(id_vars=..., var_name=..., value_name=...)."],
+  "`melt` mantiene `tienda` y convierte las columnas de trimestre en filas, con el nombre del trimestre en `trimestre` y el valor en `ventas`.",
+  "resultado ← trimestral en formato largo: tienda, trimestre, ventas",
+  problem="Pasá `trimestral` a formato **largo** con las columnas `tienda`, `trimestre` y `ventas`."),
+
+# ======================================================================== S9
+A("df-a08", S9, "Cardinalidad", 2, ["df-relaciones"],
+  "Un cliente puede tener muchos pedidos, y cada pedido pertenece a un solo cliente. ¿Qué tipo de relación es?",
+  [("Uno a muchos (1:N)", True, "Un cliente → N pedidos."),
+   ("Uno a uno", False, "Un cliente tendría un único pedido."),
+   ("Muchos a muchos", False, "Cada pedido tiene un solo cliente."),
+   ("No hay relación", False, "Se relacionan por cliente_id.")]),
+
+D("df-d04", S9, "Pedidos por cliente (incluidos los 0)", 4, ["df-relaciones", "pd-combinar", "pd-groupby"],
+  "Calculá **cuántos pedidos** hizo cada cliente (por `nombre`), **incluyendo a los que no hicieron ninguno** (con 0). Guardá la Series en `resultado`.",
+  "resultado = ",
+  "df = clientes.merge(pedidos, on='cliente_id', how='left')\nresultado = df.groupby('nombre')['pedido_id'].count()",
+  ["Si partís de pedidos, ¿aparecen los clientes sin pedidos?", "Necesitás conservar a todos los clientes aunque no tengan pareja: ¿qué tipo de merge?", "count() no cuenta los NaN: un cliente sin pedidos queda con 0."],
+  "Un left join desde clientes conserva a todos (los que no compraron quedan con pedido_id NaN). Al contar pedido_id por nombre, count() ignora los NaN y da 0.",
+  "df ← clientes LEFT JOIN pedidos por cliente_id\nresultado ← cantidad de pedido_id no nulos por nombre",
+  verify="La suma de los conteos debe ser 29 (los 30 pedidos menos el del cliente 99)."),
+
+B("df-b03", S9, "Verificar un merge", 3, ["df-relaciones"],
+  "Uniste `pedidos` (30 filas) con `productos` (10 filas) por `producto_id` y el resultado tiene **34 filas**. **¿Qué te dice eso, cuál puede ser la causa y cómo lo investigarías?**",
+  model="Como cada pedido debería tener **un** producto (relación N:1), el resultado debería tener 30 filas. Tener 34 indica que **algún producto_id está repetido en productos**: los pedidos de ese producto se duplicaron. Lo investigaría con `productos['producto_id'].duplicated().sum()` o `value_counts()` de la clave, y lo prevendría con `merge(..., validate='many_to_one')`, que da error si la tabla de la derecha tiene claves repetidas.",
+  checklist=["Dije que deberían quedar 30 filas (una por pedido)", "Identifiqué claves duplicadas en productos como causa", "Propuse cómo detectarlas (duplicated/value_counts)", "Mencioné validate o verificar len() antes y después"],
+  hints=["¿Cuántas filas esperabas con una relación N:1?", "¿Cómo puede un merge crear filas nuevas?", "¿Qué pasa si una clave aparece dos veces en la tabla de la derecha?"]),
+
+# ======================================================================== S10
+P("df31", S10, ["df-sql"],
+  ["Los datos están en la base de datos `conn`.", "Escribí la consulta SQL que filtra y elige columnas.", "pd.read_sql(consulta, conn) devuelve un DataFrame."],
+  "`read_sql` ejecuta la consulta en la base y devuelve el resultado como DataFrame.",
+  "resultado ← read_sql('SELECT nombre, ciudad FROM clientes WHERE edad > 40', conn)",
+  problem="Desde la base de datos `conn`, traé el `nombre` y la `ciudad` de los clientes con **edad mayor a 40**, usando SQL."),
+
+P("df32", S10, ["df-sql"],
+  ["El valor de corte viene en una variable (como si lo ingresara un usuario).", "No lo pegues dentro del texto de la consulta.", "Usá `?` en la consulta y `params=(valor,)`."],
+  "Con `?` y `params`, la librería inserta el valor de forma segura (sin riesgo de inyección SQL ni problemas de comillas).",
+  "resultado ← read_sql('SELECT * FROM productos WHERE precio > ?', conn, params=(precio_min,))",
+  problem="El usuario elige un precio mínimo (`precio_min`). Traé los productos con `precio` mayor a ese valor, **pasándolo como parámetro** (no pegado en el texto de la consulta)."),
+
+P("df33", S10, ["df-sql", "pd-groupby"],
+  ["Son tres pasos: calcular en pandas, guardar en la base, leer de vuelta.", "El resumen por país se arma con groupby + agg (con as_index=False para que pais sea columna).", "to_sql(..., if_exists='replace') guarda; read_sql lee."],
+  "Se calcula el resumen en pandas, se guarda como tabla con `to_sql` y se lee con `read_sql`: un ida y vuelta completo entre pandas y SQL.",
+  "resumen ← cantidad de clientes por pais (columnas pais, n_clientes)\nguardar resumen en tabla 'resumen_pais'\nresultado ← leer 'resumen_pais'",
+  problem="Calculá con pandas el número de clientes por país (columnas `pais` y `n_clientes`), guardalo en la tabla `resumen_pais` de la base y leelo de vuelta con SQL en `resultado`."),
+
+F("df-f01", S10, "La IA traduce SQL a pandas", 3, ["df-sql", "pd-groupby", "pd-filtrar"],
+  "Tenías esta consulta SQL y le pediste a una IA el equivalente en pandas:\n\n```sql\nSELECT segmento, AVG(edad) AS edad_media\nFROM clientes\nWHERE pais <> 'España'\nGROUP BY segmento\nORDER BY edad_media DESC;\n```",
+  prompt="Traducí esta consulta SQL a pandas y explicame qué parte del código corresponde a cada cláusula (WHERE, GROUP BY, AVG, ORDER BY).",
+  ai_code="resultado = (clientes[clientes['pais'] != 'España']\n             .groupby('segmento')['edad'].mean()\n             .sort_values(ascending=False))",
+  questions=[
+      ask("¿Qué parte del código corresponde al WHERE?", [("`clientes[clientes['pais'] != 'España']`", True, "El filtro de filas."), ("`.groupby('segmento')`", False, "Eso es GROUP BY."), ("`.sort_values`", False, "Eso es ORDER BY.")]),
+      ask("¿Por qué el filtro va antes del groupby?", [("Porque WHERE filtra filas antes de agrupar", True, "Mismo orden lógico que SQL."), ("Da igual el orden", False, "Filtrar después de agrupar cambiaría el resultado."), ("Porque groupby no acepta texto", False, "No.")]),
+      ask("El resultado, ¿tiene una columna llamada `edad_media`?", [("No: es una Series llamada 'edad'; habría que renombrarla", True, "El alias de SQL no se tradujo."), ("Sí", False, "Revisá: no hay ningún rename."), ("Es un DataFrame con dos columnas", False, "Es una Series.")]),
+      ask("¿Cómo comprobarías que la traducción es fiel?", model="Ejecutando la consulta original con `pd.read_sql(consulta, conn)` y comparando los valores con el resultado de pandas (mismos segmentos, mismos promedios, mismo orden)."),
+  ],
+  hints=["Relacioná cada línea con una cláusula SQL.", "Ejecutalo y mirá el nombre de la Series.", "Probá ejecutar la consulta original con read_sql y compará."],
+  explain="Filtro (WHERE) → groupby + mean (GROUP BY + AVG) → sort_values (ORDER BY). La traducción es correcta salvo el nombre de la columna (alias).",
+  solution="resultado = (clientes[clientes['pais'] != 'España']\n             .groupby('segmento')['edad'].mean()\n             .sort_values(ascending=False))"),
+
+# ======================================================================== Proyecto
+C("df-p1", SP, "Fase 1 · Diseñar la tabla resumen", 3, ["df-relaciones", "df-forma-resultado"],
+  "**Contexto:** el equipo comercial quiere una **tabla con una fila por cliente**: `cliente_id`, `nombre`, `segmento`, `n_pedidos` y `facturacion` (sin pedidos cancelados), **incluyendo a los clientes que no compraron**. Después van a comparar segmentos. Diseñá cómo construirla.",
+  [field("¿Cuántas filas debe tener la tabla final?", "12, una por cliente.", ["12 (una por cliente)", "30 (una por pedido)", "4 (una por segmento)"], 0),
+   field("Paso 1", "Pedidos no cancelados + productos (merge) para calcular importe."),
+   field("Paso 2", "Agregar por cliente_id: contar pedidos y sumar importe (una fila por cliente que compró)."),
+   field("Paso 3: ¿qué tipo de unión con clientes?", "Left desde clientes, para conservar a los que no compraron, y rellenar sus NaN con 0.", ["Left desde clientes + rellenar NaN con 0", "Inner", "concat"], 0),
+   field("Verificación", "len == 12; suma de n_pedidos == pedidos no cancelados de clientes existentes; suma de facturación == facturación total de esos pedidos."),
+  ],
+  explain="La clave es la **forma**: el resultado debe tener una fila por cliente. Primero se agrega por cliente (una fila por cliente que compró) y después se une a la tabla completa de clientes con left join.",
+  hints=["¿Qué tabla tiene a TODOS los clientes?", "¿Qué valor deberían tener n_pedidos y facturacion para quien no compró?", "¿Qué tipo de join conserva todas las filas de la izquierda?"],
+  pseudo="ped ← pedidos no cancelados + productos; importe ← cantidad × precio\npor_cliente ← agregar por cliente_id: n_pedidos, facturacion\nresultado ← clientes LEFT JOIN por_cliente; NaN → 0"),
+
+D("df-p2", SP, "Fase 2 · Construir la tabla", 4, ["df-relaciones", "pd-groupby", "df-columnas"],
+  "Construí la tabla resumen diseñada: columnas `cliente_id`, `nombre`, `segmento`, `n_pedidos`, `facturacion`; una fila por cliente (12), con 0 para quienes no compraron. Sin pedidos cancelados.",
+  "resultado = ",
+  "ped = pedidos[pedidos['estado'] != 'cancelado'].merge(productos, on='producto_id')\nped['importe'] = ped['cantidad'] * ped['precio']\npor_cliente = ped.groupby('cliente_id').agg(n_pedidos=('pedido_id', 'count'), facturacion=('importe', 'sum')).reset_index()\nresultado = (clientes[['cliente_id', 'nombre', 'segmento']]\n             .merge(por_cliente, on='cliente_id', how='left')\n             .fillna({'n_pedidos': 0, 'facturacion': 0}))",
+  ["Seguí el plan en tres pasos.", "Para agregar por cliente con dos métricas con nombre: agg(n_pedidos=(...), facturacion=(...)).", "Left join desde clientes[['cliente_id','nombre','segmento']] y fillna con un diccionario por columna."],
+  "Se calcula el importe de cada pedido válido, se agrega por cliente y se une a la tabla completa de clientes con left join, rellenando con 0 a quienes no compraron.",
+  "ped ← pedidos no cancelados + productos; importe\npor_cliente ← agg por cliente_id\nresultado ← clientes[cols] LEFT JOIN por_cliente; fillna 0",
+  verify="len(resultado) == 12 y no debe haber NaN."),
+
+D("df-p3", SP, "Fase 3 · Comparar segmentos", 3, ["pd-groupby", "df-forma-resultado"],
+  "Con la tabla resumen (ya construida en el código inicial), calculá la **facturación promedio por cliente** de cada `segmento`, ordenada de mayor a menor.",
+  "ped = pedidos[pedidos['estado'] != 'cancelado'].merge(productos, on='producto_id')\nped['importe'] = ped['cantidad'] * ped['precio']\npor_cliente = ped.groupby('cliente_id').agg(n_pedidos=('pedido_id', 'count'), facturacion=('importe', 'sum')).reset_index()\nresumen = (clientes[['cliente_id', 'nombre', 'segmento']]\n           .merge(por_cliente, on='cliente_id', how='left')\n           .fillna({'n_pedidos': 0, 'facturacion': 0}))\n\nresultado = ",
+  "ped = pedidos[pedidos['estado'] != 'cancelado'].merge(productos, on='producto_id')\nped['importe'] = ped['cantidad'] * ped['precio']\npor_cliente = ped.groupby('cliente_id').agg(n_pedidos=('pedido_id', 'count'), facturacion=('importe', 'sum')).reset_index()\nresumen = (clientes[['cliente_id', 'nombre', 'segmento']]\n           .merge(por_cliente, on='cliente_id', how='left')\n           .fillna({'n_pedidos': 0, 'facturacion': 0}))\n\nresultado = resumen.groupby('segmento')['facturacion'].mean().sort_values(ascending=False)",
+  ["La tabla ya tiene una fila por cliente: ¿qué agrupás?", "Promedio de facturacion por segmento.", "Ordená de mayor a menor."],
+  "Como la tabla tiene una fila por cliente (incluidos los 0), el promedio por segmento es realmente 'facturación media por cliente del segmento'.",
+  "resultado ← promedio de facturacion por segmento, de mayor a menor"),
+
+E("df-p4", SP, "Fase 4 · El promedio inflado", 4, ["df-relaciones", "pd-combinar"],
+  "Una versión alternativa calcula el promedio por segmento con un **inner join** y da números más altos. Corregila para que considere a todos los clientes.",
+  "ped = pedidos[pedidos['estado'] != 'cancelado'].merge(productos, on='producto_id')\nped['importe'] = ped['cantidad'] * ped['precio']\npor_cliente = ped.groupby('cliente_id')['importe'].sum().reset_index(name='facturacion')\nresumen = clientes.merge(por_cliente, on='cliente_id')\nresultado = resumen.groupby('segmento')['facturacion'].mean().sort_values(ascending=False)",
+  "ped = pedidos[pedidos['estado'] != 'cancelado'].merge(productos, on='producto_id')\nped['importe'] = ped['cantidad'] * ped['precio']\npor_cliente = ped.groupby('cliente_id')['importe'].sum().reset_index(name='facturacion')\nresumen = clientes.merge(por_cliente, on='cliente_id', how='left').fillna({'facturacion': 0})\nresultado = resumen.groupby('segmento')['facturacion'].mean().sort_values(ascending=False)",
+  detect=("¿Por qué el promedio sale inflado?", [
+      ("El inner join elimina a los clientes sin compras, que deberían contar con 0", True, "Se promedia solo entre los que compraron."),
+      ("Suma dos veces los importes", False, "No hay duplicación."),
+      ("mean está mal usado", False, "mean es correcto; el problema son las filas que faltan."),
+  ]),
+  why="Con inner join, los clientes que no compraron desaparecen de `resumen`, así que el promedio por segmento se calcula solo entre compradores. Si la pregunta es 'facturación media **por cliente** del segmento', los no compradores deben estar con 0: left join + `fillna(0)`.",
+  hints=["Compará len(resumen) con len(clientes).", "¿Qué clientes faltan y qué valor deberían aportar al promedio?", "¿Qué tipo de join los conserva?"],
+  pseudo="resumen ← clientes LEFT JOIN por_cliente; facturación faltante = 0\nresultado ← promedio por segmento"),
+
+B("df-p5", SP, "Fase 5 · Explicar la tabla", 3, ["df-relaciones", "df-forma-resultado"],
+  "Explicale al equipo comercial (4-6 líneas) **qué representa cada fila de tu tabla, por qué incluiste a los clientes sin compras, qué segmento rinde más y qué precaución deberían tener al interpretar los promedios.**",
+  model="Cada fila es un cliente (12 en total), con su cantidad de pedidos y su facturación sin cancelados. Incluí a los clientes sin compras con 0 porque, si no, el promedio por segmento solo reflejaría a quienes compraron y sobreestimaría el rendimiento. Según la tabla, el segmento con mayor facturación media por cliente es el que lidera el ranking de la fase 3. Precaución: hay pocos clientes por segmento, así que una sola compra grande (una laptop) mueve mucho el promedio; convendría mirar también la mediana.",
+  checklist=["Expliqué qué representa cada fila", "Justifiqué incluir a los clientes con 0", "Nombré el segmento con mayor promedio", "Mencioné una precaución (pocos datos, valores extremos, mediana)"],
+  hints=["¿Cuántas filas tiene tu tabla y por qué?", "¿Qué cambió entre la fase 3 y la versión con inner join?", "Con 3-4 clientes por segmento, ¿qué tan estable es un promedio?"]),
+]
+
+QUIZ = [
+Q("q-df-01", ["df-loc-iloc"], "Necesitás las filas 10 a 20 (por posición) y las columnas 2 y 3.",
+  [("iloc[10:21, 2:4]", True, "Posiciones → iloc."), ("loc", False, "loc es por etiqueta."), ("query", False, "No."), ("groupby", False, "No.")]),
+Q("q-df-02", ["df-forma-resultado"], "Querés agregar a cada venta el total de su categoría para calcular su participación.",
+  [("groupby + transform('sum')", True, "Un valor por fila."), ("groupby + sum() asignado directo", False, "Daría NaN por índices distintos."), ("merge consigo mismo sin pensar", False, "Posible, pero transform es lo directo."), ("melt", False, "No.")]),
+Q("q-df-03", ["df-reshape"], "Tenés una tabla con una columna por mes (Ene, Feb, Mar…) y querés graficar la evolución.",
+  [("melt a formato largo", True, "Mes pasa a ser una columna."), ("pivot_table", False, "Va al revés."), ("dropna", False, "No."), ("rename", False, "No.")]),
+Q("q-df-04", ["df-columnas"], "Querés marcar con 'revisar' la columna estado solo de los pedidos de más de 1000.",
+  [("df.loc[mascara, 'estado'] = 'revisar'", True, "Asignación segura."), ("df[mascara]['estado'] = 'revisar'", False, "Encadenada: no modifica."), ("df.drop", False, "No."), ("df.melt", False, "No.")]),
+Q("q-df-05", ["df-axis"], "Tenés notas de 3 exámenes en columnas y querés el promedio de cada alumno (fila).",
+  [("mean(axis=1)", True, "Un valor por fila."), ("mean()", False, "Promedio por examen."), ("sum(axis=0)", False, "No."), ("rank", False, "No.")]),
+Q("q-df-06", ["df-relaciones"], "Después de un merge, el resultado tiene más filas que la tabla original de pedidos.",
+  [("Hay claves repetidas en la otra tabla", True, "El merge duplicó filas."), ("Es normal siempre", False, "No con una relación N:1."), ("Faltan nulos", False, "No."), ("El índice está mal", False, "No es la causa.")]),
+Q("q-df-07", ["df-indice"], "Después de un groupby, la columna de agrupación ya no aparece como columna.",
+  [("Está en el índice: reset_index()", True, "Vuelve a columna."), ("Se borró", False, "No."), ("Hay que rehacer el groupby", False, "No hace falta."), ("Usar iloc", False, "No.")]),
+Q("q-df-08", ["df-mascaras"], "Querés saber qué porcentaje de clientes tiene email.",
+  [("df['email'].notna().mean()", True, "Promedio de una máscara = proporción."), ("df['email'].count()", False, "Da la cantidad, no el porcentaje."), ("value_counts()", False, "Contaría cada email."), ("shape", False, "No.")]),
+Q("q-df-09", ["df-transformar"], "Querés convertir códigos de provincia (01, 02…) en nombres usando una tabla de equivalencias chica.",
+  [("map con un diccionario", True, "Traducción directa."), ("apply con 24 if", False, "Innecesariamente largo."), ("pd.cut", False, "Es para tramos numéricos."), ("concat", False, "No.")]),
+Q("q-df-10", ["df-sql"], "Los datos están en una base de datos de la empresa con millones de filas y solo necesitás las del último mes.",
+  [("Filtrar en SQL y traer con read_sql", True, "Reducís los datos antes de traerlos."), ("Traer todo y filtrar en pandas", False, "Funciona, pero es ineficiente."), ("Copiar a Excel", False, "No."), ("to_sql", False, "Es para guardar.")]),
+]
+
+PROJECT = project(
+    "Radiografía de clientes",
+    "El equipo comercial quiere comparar segmentos de clientes. Para eso necesitan una tabla con una fila por cliente, y la forma correcta de esa tabla define si las conclusiones son válidas.",
+    "Una tabla resumen por cliente correcta (12 filas, sin NaN) y una comparación de segmentos bien interpretada.",
+    [("Diseñar", "Definí la forma de la tabla y los joins.", ["df-p1"]),
+     ("Construir", "Agregá por cliente y uní con todos los clientes.", ["df-p2"]),
+     ("Comparar", "Promedio por segmento sobre la tabla correcta.", ["df-p3"]),
+     ("Verificar", "Detectá el sesgo de un inner join.", ["df-p4"]),
+     ("Explicar", "Interpretación y precauciones.", ["df-p5"])],
+    ["Tabla resumen por cliente (12 filas)", "Facturación media por segmento", "Verificación de tamaños y nulos", "Explicación para el equipo comercial"],
+    ["Pedile a la IA la sintaxis de agg con nombres o de fillna por columna, no el diseño de la tabla.",
+     "Antes de cada join, predecí cuántas filas debería tener el resultado.",
+     "Rehacé la fase 2 sin ayuda al final."],
+)
+
+MODULE = module(
+    "m02", "02", "DataFrames", "📋", "#38bdf8",
+    "Desarrollar intuición sobre la estructura de una tabla: índice, columnas como Series, selección, ejes, qué devuelve cada operación y cómo se relacionan las tablas.",
+    learn=["Mirar un DataFrame y entender qué representa cada fila, columna e índice",
+           "Seleccionar y modificar datos con loc/iloc sin errores de copia",
+           "Predecir la forma del resultado de cada operación (agregar vs transformar)",
+           "Pasar de formato ancho a largo y al revés",
+           "Razonar relaciones entre tablas (1:N) y verificar joins"],
+    why="La mayoría de los errores con pandas no son de sintaxis: son de **forma**. Un groupby que devuelve una fila por grupo cuando necesitabas una por registro, un merge que duplica filas, una asignación que modifica una copia. Si podés **predecir la forma** de cada resultado, podés leer y corregir cualquier código, incluido el que te dé una IA.",
+    ai="Antes de ejecutar código de la IA, predecí el shape del resultado. Si no coincide, preguntale por qué. Pedile que te explique qué índice queda después de cada paso. Usala para traducir SQL ↔ pandas y verificá la traducción ejecutando ambas.",
+    concepts=CONCEPTS, exercises=EXERCISES, quiz=QUIZ, project=PROJECT,
+    setup=SETUP + DF_SETUP, packages=["sqlite3"], tables=TABLES + ["trimestral"], file="tablas.py",
+)

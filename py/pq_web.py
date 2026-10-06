@@ -108,8 +108,13 @@ def pq_run(setup, code, solution, opts_json, check=True):
     if check:
         def expected():
             exp_ns = {}
-            exec(setup, exp_ns)
-            exec(solution, exp_ns)
+            old_out = sys.stdout
+            sys.stdout = io.StringIO()  # los print de la solución oficial no deben verse
+            try:
+                exec(setup, exp_ns)
+                exec(solution, exp_ns)
+            finally:
+                sys.stdout = old_out
             return exp_ns
         try:
             ok, msg = pq_check(ns, expected, opts)  # noqa: F821
