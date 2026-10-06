@@ -2,7 +2,7 @@
 
 Laboratorio personal de **Ciencia de Datos con método**: aprender a reconocer problemas, diseñar soluciones, usar la IA como copiloto, debuggear y verificar. Sin memorizar sintaxis.
 
-👉 **Web:** https://rosalesluciano.github.io/pandas-quest/
+👉 **Web:** https://rosalesluciano.github.io/datalab/
 
 ```
 CONCEPTO → PROBLEMA → RAZONAMIENTO → ESTRATEGIA → IMPLEMENTACIÓN → VERIFICACIÓN

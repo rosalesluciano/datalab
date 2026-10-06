@@ -12,8 +12,8 @@ sys.path.insert(0, os.path.join(ROOT, "build"))
 
 from content import LEVELS, MODULES, TYPES  # noqa: E402
 
-REPO = "rosalesluciano/pandas-quest"
-SITE = "https://rosalesluciano.github.io/pandas-quest/"
+REPO = "rosalesluciano/datalab"
+SITE = "https://rosalesluciano.github.io/datalab/"
 RUNNABLE = {"D", "E", "G"}
 
 

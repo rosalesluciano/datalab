@@ -74,7 +74,7 @@
 
       <footer class="foot">
         <span>🧪 DataLab (PandasQuest) · Python, Pandas, NumPy, Matplotlib, Seaborn y Machine Learning en el navegador</span>
-        <span><a href="https://github.com/rosalesluciano/pandas-quest" target="_blank" rel="noopener">GitHub</a> · <a href="#/progreso">Progreso y copia de seguridad</a></span>
+        <span><a href="https://github.com/rosalesluciano/datalab" target="_blank" rel="noopener">GitHub</a> · <a href="#/progreso">Progreso y copia de seguridad</a></span>
       </footer>
     </div>`;
   };
